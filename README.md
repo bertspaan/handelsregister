@@ -24,5 +24,3 @@ Import CSV files into new Neo4j database:
 cd batch-import
 ./import.sh /usr/local/Cellar/neo4j/2.0.0/libexec/data/graph.db ../data/nodes.csv ../data/rels.csv
 ```
-
-
