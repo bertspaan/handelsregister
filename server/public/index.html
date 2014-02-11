@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Handelsregister</title>
+  <meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<link rel="stylesheet" href="style.css" />
+  <script src="d3.v3.min.js" charset="utf-8"></script>
+</head>
+<body>
+  <div id="box">
+    <input type="text" name="search">
+  </div>
+  <div id="container">
+    <svg>
+    </svg>
+  </div>
+<script src="d3.v3.min.js"></script>
+<script>
+  // Examples: 
+  //  Static: http://bl.ocks.org/mbostock/1667139
+
+  var id = 1339353;
+
+  var width = window.innerWidth, height = window.innerHeight;
+  
+  var resizeTimer;
+  var root,
+      nodes = {},
+      links = {};
+
+  var circle,
+      text,
+      link;
+
+  var force = d3.layout.force()
+      .gravity(.09)
+      .charge(-800)
+      .linkDistance(200)
+      .on("tick", tick)
+      .size([width, height]);
+
+  var svg = d3.select("svg");
+  
+  var linkG = svg.append("g");
+  var circleG = svg.append("g");
+  var textG = svg.append("g");
+  
+  if (location.hash) {
+    id = location.hash.substring(1);
+  }
+  
+  function tick() {
+    circle.attr("transform", transform);
+    text.attr("transform", transform);      
+    link.attr("x1", function(d) { return d.source.x; })
+        .attr("y1", function(d) { return d.source.y; })
+        .attr("x2", function(d) { return d.target.x; })
+        .attr("y2", function(d) { return d.target.y; });
+  }
+
+  function transform(d) {
+    return "translate(" + d.x + "," + d.y + ")";
+  } 
+
+  d3.select(window).on("resize", function() {
+    clearInterval(resizeTimer);
+    resizeTimer = setInterval(resize, 20);  
+  });  
+
+  function resize() {
+    width = window.innerWidth, height = window.innerHeight;
+    svg.attr("width", width).attr("height", height);
+    force.size([width, height]).resume();
+  }
+
+  function onclick(d) {
+    data(d.id);
+  }
+  
+  function data(id) {
+    d3.json("http://localhost:5252/api/" + id, function(json) {
+          
+      width = window.innerWidth, height = window.innerHeight;
+            
+      // Compute the distinct nodes from the links.
+      json.links.forEach(function(link) {
+
+        var source = nodes[link.source] || (nodes[link.source] = {
+          id: json.nodes[link.source].id,
+          name: json.nodes[link.source].name,
+          x: width / 2,
+          y: height / 2,
+          outgoing: [],
+          incoming: []
+        });
+
+        var target = nodes[link.target] || (nodes[link.target] = {
+          id: json.nodes[link.target].id,
+          name: json.nodes[link.target].name,
+          x: width / 2,
+          y: height / 2,
+          outgoing: [],
+          incoming: []
+        });
+        
+        nodes[link.source].outgoing.push(target);
+        nodes[link.target].incoming.push(source);
+
+        if (source.id == id) {
+          root = source;
+        } else if (target.id == id) {
+          root = target;
+        }
+        
+
+                
+        links[source.id + "-" + target.id] || (links[source.id + "-" + target.id] = {
+          source: source,
+          target: target,
+          type: link.type
+        });  
+        
+      });
+
+      // 2. Reken lengte l uit van n naar alle andere nodes (Dijkstra)
+      // 3. Gooi alle nodes weg met l > x
+      
+      console.log(root);
+      
+  
+
+
+
+      update();
+  
+    });
+  }
+
+  function update() {
+           
+    force
+         .nodes(d3.values(nodes))
+         .links(d3.values(links));        
+
+    // Per-type markers, as they don't inherit styles.
+    // svg.append("defs").selectAll("marker")
+    //     .data(["suit", "licensing", "resolved"])
+    //   .enter().append("marker")
+    //     .attr("id", function(d) { return d; })
+    //     .attr("viewBox", "0 -5 10 10")
+    //     .attr("refX", 15)
+    //     .attr("refY", -1.5)
+    //     .attr("markerWidth", 6)
+    //     .attr("markerHeight", 6)
+    //     .attr("orient", "auto")
+    //   .append("path")
+    //     .attr("d", "M0,-5L10,0L0,5");        
+      
+    link = linkG.selectAll("line")
+        .data(force.links(), function(d) { return d.source.id + "-" + d.target.id; });
+        
+    link.enter().append("line")
+        .attr("x1", function(d) { return d.source.x; })
+        .attr("y1", function(d) { return d.source.y; })
+        .attr("x2", function(d) { return d.target.x; })
+        .attr("y2", function(d) { return d.target.y; })
+        .attr("id", function(d, i) { return "path" + i; });
+    link.exit().remove();
+    
+    // var pathText = linkG.selectAll("text")
+    //     .data(force.links())
+    //   .enter().append("text")
+    //     .style("width", "100%")
+    //     .style("text-anchor", "middle")
+    //     .style("font-size", "8px")
+    //     .style("padding", "3px")
+    //     .style("background-color", "white")
+    //     .attr("dy", "-4px")
+    //   .append("textPath")
+    //     .attr("xlink:href", function(d, i) { return "#path" + i; })
+    //     .attr("startOffset", "50%")
+    //     .html(function(d) { return d.type; });
+  
+    circle = circleG.selectAll("circle")
+        .data(force.nodes(), function(d) { return d.id;});
+        
+    circle.enter().append("circle")
+        .attr("transform", transform)
+        .attr("r", 6)
+        .on("click", onclick)
+        .call(force.drag);
+    circle.exit().remove();
+
+    text = textG.selectAll("text")
+        .data(force.nodes(), function(d) { return d.id;});
+        
+    text.enter().append("text")
+        .attr("x", 8)
+        .attr("y", ".31em")
+        .text(function(d) { return d.name; });
+    text.exit().remove();
+  
+    force.start();
+
+  }
+
+  data(id);
+
+</script>
